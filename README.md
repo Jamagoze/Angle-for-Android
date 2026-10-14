@@ -141,7 +141,7 @@ angle_sys/
 ## 3. Install
 
 1. Disable or remove any older ANGLE modules to avoid conflicts.
-2. Magisk → **Modules** → **Install from storage** → pick `angle_sys_v2_3.zip`.
+2. Magisk → **Modules** → **Install from storage** → pick `angle_sys.zip or angle_sys_v2_3.zip`.
 3. Reboot.
 
 ---
