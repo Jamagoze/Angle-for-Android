@@ -3,6 +3,7 @@
 Build [ANGLE](https://chromium.googlesource.com/angle/angle) (OpenGL ES on top of Vulkan) for Android **without a PC**, then install it as a **system-wide Magisk module** so every app launched after boot renders through ANGLE.
 
 <img width="1632" height="1020" alt="1000866288" src="https://github.com/user-attachments/assets/894084cb-fe2a-4a80-8d72-cb8b273a9053" />
+YT Link: https://www.youtube.com/watch?v=1FC1FKy6MPM
 
 Made and tested on a **Redmi Pad SE** (Snapdragon 680 / Adreno 610, Android 14, HyperOS, rooted with Magisk).
 
