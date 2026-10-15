@@ -7,8 +7,8 @@ YT Link: https://www.youtube.com/watch?v=1FC1FKy6MPM
 
 Made and tested on a **Redmi Pad SE** (Snapdragon 680 / Adreno 610, Android 14, HyperOS, rooted with Magisk).
 
-- **64-bit (arm64):**
-- **32-bit (arm):**
+- **64-bit (arm64)**
+- **32-bit (arm)**
 
 > ⚠️ **Rooted devices only.** Replacing the system EGL loader can break apps. Read [Bootloop protection](#bootloop-protection) and [Uninstall / Recovery](#uninstall--recovery) before flashing.
 
