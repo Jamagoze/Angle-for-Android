@@ -20,10 +20,12 @@ Made and tested on a **Redmi Pad SE** (Snapdragon 680 / Adreno 610, Android 14, 
 
 1. **GitHub Actions** builds ANGLE from the official source (no PC needed, runs from a phone browser). One workflow builds **64-bit**, a second one builds **32-bit**.
 2. A small **Magisk / KernelSU module** (a ready-made sample is in this repo) puts the ANGLE libraries in `/vendor/lib64/egl/` (64-bit) and, optionally, `/vendor/lib/egl/` (32-bit).
-3. On every boot, `service.sh` sets `persist.graphics.egl=angle`, so Android's EGL loader picks the ANGLE libraries for newly started apps. 64-bit apps use the 64-bit libs and 32-bit apps use the 32-bit libs.
+3. On every boot, `post-fs-data.sh` first clears any saved `persist.graphics.egl` value, so the boot always starts on the native driver. After boot completes, `service.sh` verifies the libs and sets `persist.graphics.egl=angle` **in memory only** (`resetprop -n`), so Android's EGL loader picks the ANGLE libraries for newly started apps. 64-bit apps use the 64-bit libs and 32-bit apps use the 32-bit libs.
 4. A **bootloop guard** disables the module automatically if a boot fails (see [Bootloop protection](#bootloop-protection)).
 
-The prop is set **after boot completes**, so SurfaceFlinger (the compositor) keeps using the native driver. This makes a bootloop unlikely in the first place.
+The prop is set **after boot completes**, so SurfaceFlinger (the compositor), the boot animation and zygote keep using the native driver. This makes a bootloop unlikely in the first place.
+
+> ⚠️ **Why the prop must never be saved to disk.** Once `persist.graphics.egl` says `angle`, ANGLE *is* the GLES driver for every process that starts, not an optional layer, and the loader does not fall back to the native Adreno driver if the libs are missing. Zygote, the boot animation and SurfaceFlinger all use GL, so a saved `angle` value with missing libs (module disabled, removed, safe mode) means a black screen or bootloop. That is why this module sets the prop with `resetprop -n` (memory only) and clears any saved value at the start of every boot.
 
 No ANGLE APK is needed.
 
@@ -48,7 +50,7 @@ Leave Developer options at their defaults. This module works through the system 
 - A GitHub account
 - Termux (`pkg install git unzip zip`) for editing and zipping the module
 
-> The module was developed and tested on **Magisk**. KernelSU support relies on the same standard module scripts, but has not been tested on every KernelSU variant.
+> The module was developed and tested on **Magisk**. KernelSU support relies on the same standard module scripts, but has not been tested on every KernelSU variant. The scripts need a working `resetprop` (see [Things to know](#things-to-know)); without one, ANGLE stays off.
 
 Check whether your device has 32-bit support (skip the 32-bit parts if this prints nothing):
 
@@ -178,9 +180,9 @@ If your device has no 32-bit support, leave out `lib/egl/`.
 | `system/vendor/lib64/egl/*.so` | The 64-bit ANGLE libraries. The root manager overlays them onto `/vendor/lib64/egl/`, where Android's EGL loader looks for `libEGL_<name>.so`. Nothing on the real partition is modified. |
 | `system/vendor/lib/egl/*.so` | The 32-bit ANGLE libraries, overlaid onto `/vendor/lib/egl/`. Used by 32-bit apps only. |
 | `customize.sh` | Runs at install time and sets permissions (`0755` folders, `0644` files) and the SELinux label `u:object_r:same_process_hal_file:s0` on the lib folders, which the loader needs to be allowed to load them into app processes. |
-| `post-fs-data.sh` | Runs early on every boot. Part of the bootloop guard: it adds 1 to a boot counter and disables the module if the previous boot never finished. |
-| `service.sh` | Runs on every boot. It waits until `sys.boot_completed` is `1`, resets the boot counter after 30 seconds of stability, checks that the ANGLE libs are really present, and only then runs `resetprop persist.graphics.egl angle`. |
-| `uninstall.sh` | Runs when you remove the module in the root manager and deletes `persist.graphics.egl`, so Android doesn't keep looking for libraries that no longer exist. |
+| `post-fs-data.sh` | Runs early on every boot, before zygote starts. It first deletes any saved `persist.graphics.egl` value, so the boot always starts on the native driver. It is also part of the bootloop guard: it adds 1 to a boot counter and disables the module if the previous boot never finished. |
+| `service.sh` | Runs on every boot. It finds `resetprop` (Magisk, KernelSU, KernelSU Next or APatch locations, then `PATH`), waits until `sys.boot_completed` is `1`, resets the boot counter after 30 seconds of stability, checks that the ANGLE libs are really present, and only then runs `resetprop -n persist.graphics.egl angle` (memory only, never saved to disk). If `resetprop` is not found, ANGLE stays off. |
+| `uninstall.sh` | Runs when you remove the module in the root manager. It deletes any saved `persist.graphics.egl` value and the module's data folder. |
 
 ### Using it
 
@@ -204,10 +206,11 @@ If your device has no 32-bit support, leave out `lib/egl/`.
 
 The module protects itself so a bad install can't leave you stuck:
 
-1. **Boot counter.** `post-fs-data.sh` adds 1 to a counter at the start of every boot. `service.sh` resets it to 0 once boot has completed and stayed stable for 30 seconds.
-2. **One failed boot disables the module.** If a boot starts while the counter is still above zero, the previous boot never finished. The module then creates its `disable` file (so the root manager skips it) and deletes the ANGLE prop. The next boot runs on the native driver.
-3. **Library check.** ANGLE is only switched on if every required `.so` file is present in `/vendor/lib64/egl/` (and `/vendor/lib/egl/` when the device has 32-bit support). If one is missing, the module stays off.
-4. **Late activation.** The prop is set only after the system has finished booting, so the compositor never starts on ANGLE.
+1. **Clean start.** `post-fs-data.sh` deletes any saved `persist.graphics.egl` value before zygote starts, so every boot begins on the native driver even if the libs are missing or the module is disabled.
+2. **Boot counter.** `post-fs-data.sh` adds 1 to a counter at the start of every boot. `service.sh` resets it to 0 once boot has completed and stayed stable for 30 seconds.
+3. **One failed boot disables the module.** If a boot starts while the counter is still above zero, the previous boot never finished. The module then creates its `disable` file (so the root manager skips it) and deletes the ANGLE prop. The next boot runs on the native driver.
+4. **Library check.** ANGLE is only switched on if every required `.so` file is present in `/vendor/lib64/egl/` (and `/vendor/lib/egl/` when the device has 32-bit support). If one is missing, the module stays off.
+5. **Late, memory-only activation.** The prop is set only after the system has finished booting, and only in memory (`resetprop -n`). The compositor never starts on ANGLE, and a reboot without the module running returns to the native driver.
 
 ### Root manager safety nets (Magisk and KernelSU)
 
@@ -227,13 +230,14 @@ After safe mode, modules usually stay disabled until you turn them back on in th
 
 - **To re-arm the module** after it disabled itself, switch it back on in the Modules list of your root manager and reboot.
 - **False trip:** rebooting within 30 seconds of the UI appearing (or a crash in that window) counts as a failed boot and disables the module. Just re-enable it.
-- **Safe mode is the safe outcome:** if Magisk or KernelSU catches a bootloop first, it skips all modules and none of this module's scripts run. ANGLE stays off.
+- **Safe mode is the safe outcome:** if Magisk or KernelSU catches a bootloop first, it skips all modules and none of this module's scripts run. ANGLE stays off, because the prop is never saved to disk. Older versions of this module (v2.4 and earlier) saved the prop, so after updating, boot once with the new module so it clears the old value. If you are stuck on an older version, see [Uninstall / Recovery](#uninstall--recovery).
 - **Recovery without the manager app:** from adb or a custom recovery, run:
   ```sh
   touch /data/adb/modules/angle_sys/disable
   ```
   then reboot. This works the same on Magisk and KernelSU.
-- **`resetprop` on KernelSU:** the scripts use `resetprop` to set and delete `persist.graphics.egl`. Magisk always ships it. If your KernelSU build doesn't, install a KernelSU variant that includes it, or use `setprop` as a fallback. Test with `su -c "which resetprop"`.
+- **`resetprop` on KernelSU:** the scripts use `resetprop` to set the prop in memory and delete the saved one. Magisk always ships it. On other managers `service.sh` looks in `/data/adb/ksu/bin/`, `/data/adb/ap/bin/`, `/data/adb/magisk/` and your `PATH`. Check yours with `su -c "which resetprop"` or `ls /data/adb/ksu/bin`, and add its path to the list at the top of `service.sh` if it is somewhere else. Do **not** use plain `setprop` as a fallback: it saves the value to disk and brings back the black-screen problem. If no `resetprop` is found, ANGLE simply stays off.
+- **KernelSU mounting:** without a KernelSU metamodule the module's libs are not mounted into `/vendor`, so the library check fails and ANGLE stays off. That is the safe outcome.
 - The guard cannot help with problems that appear after a normal boot (for example one app crashing on ANGLE). See [Uninstall / Recovery](#uninstall--recovery) for that.
 
 ---
@@ -251,7 +255,7 @@ After safe mode, modules usually stay disabled until you turn them back on in th
 ```sh
 su -c "getprop persist.graphics.egl"
 ```
-Should print `angle`.
+Should print `angle` after boot. The value lives in memory only, so it is gone after every reboot until `service.sh` runs again.
 
 Open an app or game (e.g. Minecraft), then check that ANGLE libs are really loaded in its process:
 
@@ -273,9 +277,11 @@ Expect something like `ANGLE (Qualcomm, Vulkan ... Adreno ...)`.
 
 ## Uninstall / Recovery
 
-The ANGLE prop may survive reboots. If the libs are removed while the prop still says `angle`, apps can crash or show black screens. The included `uninstall.sh` cleans this up when you remove the module in your root manager, and the bootloop guard deletes it when it disables the module.
+If the libs are removed while the prop still says `angle`, apps can crash or show black screens, and because ANGLE is the GLES driver at that point (no fallback to the native driver), the boot itself can fail. This module avoids that by setting the prop in memory only and clearing any saved value at the start of every boot, so a reboot with the module disabled, removed or skipped in safe mode returns to the native driver.
 
-If something breaks, run this from Termux (root) or adb, then reboot:
+Older versions of this module (v2.4 and earlier) saved the prop with `resetprop persist.graphics.egl angle`, so it can still be on disk on devices that ran them. `uninstall.sh` and the bootloop guard delete it, but if the module was only disabled or skipped, clear it manually.
+
+If something breaks, run this from Termux (root) or adb (or `adb shell` in recovery if you can reach it), then reboot:
 
 ```sh
 su -c "resetprop -p --delete persist.graphics.egl"
