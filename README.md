@@ -1,6 +1,6 @@
 # Angle-for-Android
 
-Build [ANGLE](https://chromium.googlesource.com/angle/angle) (OpenGL ES on top of Vulkan) for Android **without a PC**, then install it as a **system-wide Magisk module** so every app launched after boot renders through ANGLE.
+Build [ANGLE](https://chromium.googlesource.com/angle/angle) (OpenGL ES on top of Vulkan) for Android **without a PC**, then install it as a **system-wide Magisk / KernelSU module** so every app launched after boot renders through ANGLE.
 
 <img width="1632" height="1020" alt="1000866288" src="https://github.com/user-attachments/assets/894084cb-fe2a-4a80-8d72-cb8b273a9053" />
 YT Link: https://www.youtube.com/watch?v=1FC1FKy6MPM
@@ -19,7 +19,7 @@ Made and tested on a **Redmi Pad SE** (Snapdragon 680 / Adreno 610, Android 14, 
 ## How it works
 
 1. **GitHub Actions** builds ANGLE from the official source (no PC needed, runs from a phone browser). One workflow builds **64-bit**, a second one builds **32-bit**.
-2. A small **Magisk module** (a ready-made sample is in this repo) puts the ANGLE libraries in `/vendor/lib64/egl/` (64-bit) and, optionally, `/vendor/lib/egl/` (32-bit).
+2. A small **Magisk / KernelSU module** (a ready-made sample is in this repo) puts the ANGLE libraries in `/vendor/lib64/egl/` (64-bit) and, optionally, `/vendor/lib/egl/` (32-bit).
 3. On every boot, `service.sh` sets `persist.graphics.egl=angle`, so Android's EGL loader picks the ANGLE libraries for newly started apps. 64-bit apps use the 64-bit libs and 32-bit apps use the 32-bit libs.
 4. A **bootloop guard** disables the module automatically if a boot fails (see [Bootloop protection](#bootloop-protection)).
 
@@ -43,10 +43,12 @@ Leave Developer options at their defaults. This module works through the system 
 
 ## Requirements
 
-- Rooted Android device with Magisk
+- Rooted Android device with Magisk or KernelSU
 - Vulkan-capable GPU/driver (Adreno 610 on the test device)
 - A GitHub account
 - Termux (`pkg install git unzip zip`) for editing and zipping the module
+
+> The module was developed and tested on **Magisk**. KernelSU support relies on the same standard module scripts, but has not been tested on every KernelSU variant.
 
 Check whether your device has 32-bit support (skip the 32-bit parts if this prints nothing):
 
@@ -172,13 +174,13 @@ If your device has no 32-bit support, leave out `lib/egl/`.
 
 | File | Purpose |
 |------|---------|
-| `module.prop` | Module id, name and version shown in Magisk. |
-| `system/vendor/lib64/egl/*.so` | The 64-bit ANGLE libraries. Magisk overlays them onto `/vendor/lib64/egl/`, where Android's EGL loader looks for `libEGL_<name>.so`. Nothing on the real partition is modified. |
+| `module.prop` | Module id, name and version shown in the root manager. |
+| `system/vendor/lib64/egl/*.so` | The 64-bit ANGLE libraries. The root manager overlays them onto `/vendor/lib64/egl/`, where Android's EGL loader looks for `libEGL_<name>.so`. Nothing on the real partition is modified. |
 | `system/vendor/lib/egl/*.so` | The 32-bit ANGLE libraries, overlaid onto `/vendor/lib/egl/`. Used by 32-bit apps only. |
 | `customize.sh` | Runs at install time and sets permissions (`0755` folders, `0644` files) and the SELinux label `u:object_r:same_process_hal_file:s0` on the lib folders, which the loader needs to be allowed to load them into app processes. |
 | `post-fs-data.sh` | Runs early on every boot. Part of the bootloop guard: it adds 1 to a boot counter and disables the module if the previous boot never finished. |
 | `service.sh` | Runs on every boot. It waits until `sys.boot_completed` is `1`, resets the boot counter after 30 seconds of stability, checks that the ANGLE libs are really present, and only then runs `resetprop persist.graphics.egl angle`. |
-| `uninstall.sh` | Runs when you remove the module in Magisk and deletes `persist.graphics.egl`, so Android doesn't keep looking for libraries that no longer exist. |
+| `uninstall.sh` | Runs when you remove the module in the root manager and deletes `persist.graphics.egl`, so Android doesn't keep looking for libraries that no longer exist. |
 
 ### Using it
 
@@ -203,15 +205,35 @@ If your device has no 32-bit support, leave out `lib/egl/`.
 The module protects itself so a bad install can't leave you stuck:
 
 1. **Boot counter.** `post-fs-data.sh` adds 1 to a counter at the start of every boot. `service.sh` resets it to 0 once boot has completed and stayed stable for 30 seconds.
-2. **One failed boot disables the module.** If a boot starts while the counter is still above zero, the previous boot never finished. The module then creates its `disable` file (so Magisk skips it) and deletes the ANGLE prop. The next boot runs on the native driver.
+2. **One failed boot disables the module.** If a boot starts while the counter is still above zero, the previous boot never finished. The module then creates its `disable` file (so the root manager skips it) and deletes the ANGLE prop. The next boot runs on the native driver.
 3. **Library check.** ANGLE is only switched on if every required `.so` file is present in `/vendor/lib64/egl/` (and `/vendor/lib/egl/` when the device has 32-bit support). If one is missing, the module stays off.
 4. **Late activation.** The prop is set only after the system has finished booting, so the compositor never starts on ANGLE.
 
-Things to know:
+### Root manager safety nets (Magisk and KernelSU)
 
-- **To re-arm the module** after it disabled itself, switch it back on in the Magisk Modules list and reboot.
+The module's own guard works on both Magisk and KernelSU, because it only relies on the standard `post-fs-data.sh` / `service.sh` scripts and the `disable` file. On top of that, each root manager has its own recovery mechanism that runs independently of this module.
+
+| | Magisk | KernelSU |
+|---|---|---|
+| **Automatic protection** | Detects repeated failed boots and boots into **safe mode**, which skips all modules. | Detects repeated failed boots and skips all modules (safe mode). |
+| **Manual safe mode** | Hold **Volume Down** during boot (device dependent). | Press **Volume Down** several times right after the boot logo appears. |
+| **Disable one module** | Create `/data/adb/modules/angle_sys/disable` | Create `/data/adb/modules/angle_sys/disable` |
+| **Remove one module** | Create `/data/adb/modules/angle_sys/remove`, or delete the folder | Create `/data/adb/modules/angle_sys/remove`, or delete the folder |
+| **Manager app** | Modules → toggle off / remove | Modules → toggle off / remove |
+
+After safe mode, modules usually stay disabled until you turn them back on in the manager app. The module's folder is untouched, so you can re-enable it or delete it from there.
+
+### Things to know
+
+- **To re-arm the module** after it disabled itself, switch it back on in the Modules list of your root manager and reboot.
 - **False trip:** rebooting within 30 seconds of the UI appearing (or a crash in that window) counts as a failed boot and disables the module. Just re-enable it.
-- **Magisk safe mode:** if Magisk catches a bootloop first, it skips all modules and none of this runs. ANGLE stays off, which is the safe outcome.
+- **Safe mode is the safe outcome:** if Magisk or KernelSU catches a bootloop first, it skips all modules and none of this module's scripts run. ANGLE stays off.
+- **Recovery without the manager app:** from adb or a custom recovery, run:
+  ```sh
+  touch /data/adb/modules/angle_sys/disable
+  ```
+  then reboot. This works the same on Magisk and KernelSU.
+- **`resetprop` on KernelSU:** the scripts use `resetprop` to set and delete `persist.graphics.egl`. Magisk always ships it. If your KernelSU build doesn't, install a KernelSU variant that includes it, or use `setprop` as a fallback. Test with `su -c "which resetprop"`.
 - The guard cannot help with problems that appear after a normal boot (for example one app crashing on ANGLE). See [Uninstall / Recovery](#uninstall--recovery) for that.
 
 ---
@@ -219,7 +241,7 @@ Things to know:
 ## 3. Install
 
 1. Disable or remove any older ANGLE modules to avoid conflicts.
-2. Magisk → **Modules** → **Install from storage** → pick the module zip (for example `angle_sys.zip` or `angle_sys_v2_3.zip`).
+2. Magisk or KernelSU → **Modules** → **Install from storage** → pick the module zip (for example `angle_sys.zip` or `angle_sys_v2_3.zip`).
 3. Reboot.
 
 ---
@@ -251,7 +273,7 @@ Expect something like `ANGLE (Qualcomm, Vulkan ... Adreno ...)`.
 
 ## Uninstall / Recovery
 
-The ANGLE prop may survive reboots. If the libs are removed while the prop still says `angle`, apps can crash or show black screens. The included `uninstall.sh` cleans this up when you remove the module in Magisk, and the bootloop guard deletes it when it disables the module.
+The ANGLE prop may survive reboots. If the libs are removed while the prop still says `angle`, apps can crash or show black screens. The included `uninstall.sh` cleans this up when you remove the module in your root manager, and the bootloop guard deletes it when it disables the module.
 
 If something breaks, run this from Termux (root) or adb, then reboot:
 
@@ -259,7 +281,7 @@ If something breaks, run this from Termux (root) or adb, then reboot:
 su -c "resetprop -p --delete persist.graphics.egl"
 ```
 
-If you can't boot at all, boot into Magisk safe mode or delete `/data/adb/modules/angle_sys` from recovery or adb.
+If you can't boot at all, boot into safe mode (see [Root manager safety nets](#root-manager-safety-nets-magisk-and-kernelsu)) or delete `/data/adb/modules/angle_sys` from recovery or adb.
 
 ---
 
@@ -267,13 +289,14 @@ If you can't boot at all, boot into Magisk safe mode or delete `/data/adb/module
 
 - Affects apps started **after** boot. Skia-on-GL UI rendering goes through ANGLE; **Vulkan-direct** apps and Skia-on-Vulkan (`skiavk`) bypass EGL and are unaffected (for example Mobile Legends renders through Vulkan on the test device).
 - ANGLE is all-or-nothing: the prop is global, so there is no per-app switch. If one app misbehaves, compare with the module disabled.
-- If Magisk says *Unable to extract zip file*, add a `META-INF/com/google/android/` folder with Magisk's standard `update-binary` and `updater-script` to the zip.
+- If your root manager says *Unable to extract zip file*, add a `META-INF/com/google/android/` folder with the standard `update-binary` and `updater-script` to the zip.
 - Why not build on-device? The ANGLE/Chromium toolchain only ships for x86_64 Linux, and the checkout is huge, so a cloud build is the practical option on a phone or tablet.
 
 ## Credits
 
 - [ANGLE](https://chromium.googlesource.com/angle/angle) by Google and contributors (BSD-3-Clause)
 - [Magisk](https://github.com/topjohnwu/Magisk) by topjohnwu
+- [KernelSU](https://github.com/tiann/KernelSU) by tiann and contributors
 
 ## License
 
