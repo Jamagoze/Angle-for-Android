@@ -298,6 +298,30 @@ If you can't boot at all, boot into safe mode (see [Root manager safety nets](#r
 - If your root manager says *Unable to extract zip file*, add a `META-INF/com/google/android/` folder with the standard `update-binary` and `updater-script` to the zip.
 - Why not build on-device? The ANGLE/Chromium toolchain only ships for x86_64 Linux, and the checkout is huge, so a cloud build is the practical option on a phone or tablet.
 
+## Troubleshooting
+
+### App crashes or glitches with ANGLE
+
+`angle_sys` applies ANGLE to every app on the system. If an app crashes, freezes, shows glitchy graphics or fails to start, exclude it with Magisk's DenyList so it uses the native GPU driver.
+
+1. Open **Magisk → Settings** and enable **Zygisk**.
+2. Enable **Enforce DenyList**.
+3. Open **Configure DenyList** and tick the affected app (show system apps if needed).
+4. Reboot.
+
+The DenyList hides module files from the selected app, so it loads the stock Adreno driver instead of ANGLE. Other apps keep using ANGLE.
+
+**Tip:** To check whether ANGLE is the cause, see if the app's process loads `libEGL_angle.so` (look in `/proc/<pid>/maps`). Disabling the module and retrying also works.
+
+### Apps and games that use WebView
+
+Many apps embed a WebView for login screens, ads, news feeds, terms pages or in-app browsers. This includes many older games and ad-supported games. If an app crashes while showing one of these screens, the problem may be WebView rather than ANGLE.
+
+- Don't remove the 32-bit libraries (`lib/armeabi-v7a`) from the system WebView. 32-bit-only apps will crash on launch with an error like `libwebviewchromium.so is 64-bit instead of 32-bit`.
+- If you replace or modify WebView, keep a build that has both 32-bit and 64-bit libs ("6432" variant).
+- You can switch the WebView provider in **Developer options → WebView implementation**.
+- To tell the two causes apart: if the app still crashes with the module disabled, it isn't ANGLE.
+
 ## Credits
 
 - [ANGLE](https://chromium.googlesource.com/angle/angle) by Google and contributors (BSD-3-Clause)
