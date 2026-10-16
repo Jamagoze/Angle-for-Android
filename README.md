@@ -245,7 +245,7 @@ After safe mode, modules usually stay disabled until you turn them back on in th
 ## 3. Install
 
 1. Disable or remove any older ANGLE modules to avoid conflicts.
-2. Magisk or KernelSU → **Modules** → **Install from storage** → pick the module zip (for example `angle_sys.zip` or `angle_sys_v2_3.zip`).
+2. Magisk or KernelSU → **Modules** → **Install from storage** → pick the module zip (for example `angle_sys_v2_5_magisk.zip` or `angle_sys_v2_5_kernelsu.zip`).
 3. Reboot.
 
 ---
