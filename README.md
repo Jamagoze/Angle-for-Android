@@ -35,7 +35,7 @@ Made and tested on a **Redmi Pad SE** (Snapdragon 680 / Adreno 610, Android 14, 
 
 The prop is set **after boot completes**, so SurfaceFlinger (the compositor), the boot animation and zygote keep using the native driver. This makes a bootloop unlikely in the first place.
 
-> ⚠️ **Why the prop must never be saved to disk.** Once `persist.graphics.egl` says `angle`, ANGLE *is* the GLES driver for every process that starts, not an optional layer, and the loader does not fall back to the native Adreno driver if the libs are missing. Zygote, the boot animation and SurfaceFlinger all use GL, so a saved `angle` value with missing libs (module disabled, removed, safe mode) means a black screen or bootloop. That is why this module sets the prop with `resetprop -n` (memory only) and clears any saved value at the start of every boot.
+> ⚠️ **Why the prop must never be saved to disk.** Once `persist.graphics.egl` says `angle`, ANGLE *is* the GLES driver for every process that starts, not an optional layer, and the loader does not fall back to the native driver if the libs are missing. Zygote, the boot animation and SurfaceFlinger all use GL, so a saved `angle` value with missing libs (module disabled, removed, safe mode) means a black screen or bootloop. That is why this module sets the prop with `resetprop -n` (memory only) and clears any saved value at the start of every boot.
 
 No ANGLE APK is needed.
 
@@ -320,7 +320,7 @@ If you can't boot at all, boot into safe mode (see [Root manager safety nets](#r
 3. Open **Configure DenyList** and tick the affected app (show system apps if needed).
 4. Reboot.
 
-The DenyList hides module files from the selected app, so it loads the stock Adreno driver instead of ANGLE. Other apps keep using ANGLE.
+The DenyList hides module files from the selected app, so it loads the stock driver instead of ANGLE. Other apps keep using ANGLE.
 
 **Tip:** To check whether ANGLE is the cause, see if the app's process loads `libEGL_angle.so` (look in `/proc/<pid>/maps`). Disabling the module and retrying also works.
 
