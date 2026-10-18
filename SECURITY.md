@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-The following table details the maintenance and security support status for the `Minecraft-Bedrock-Optimization` repository (`Jamagoze/Minecraft-Bedrock-Optimization`). Because resource packs, texture alterations, and asset optimizations are continuously updated to align with evolving Minecraft Bedrock engine builds, only the latest commit on the `main` branch is actively supported.
+The following table details the active support status for the `Angle-for-Android` repository (`Jamagoze/Angle-for-Android`). Because this project deals with graphics backend translations, rendering pipelines, and driver overrides, security updates and bug fixes are applied exclusively to the latest commit on the `main` branch.
 
 | Version | Supported |
 | :--- | :--- |
@@ -13,12 +13,12 @@ The following table details the maintenance and security support status for the 
 
 ## Reporting a Vulnerability
 
-If you identify a security concern, an asset payload issue, malicious modification risk, or a vulnerability within the optimization scripts and resource configurations provided in this repository, please report it responsibly:
+If you identify a security vulnerability, rendering crash exploit, privilege escalation vector, or stability issue related to the ANGLE integration or scripts in this repository, please report it responsibly:
 
-* **Reporting Channel:** Use GitHub's private vulnerability reporting feature or reach out via direct repository communication channels to avoid public exposure before mitigation.
+* **Reporting Channel:** Utilize GitHub's private vulnerability reporting feature or reach out via direct repository communication channels to prevent premature public exposure.
 * **Information to Include:**
-  * A precise description of the issue or unexpected behavior observed when loading the optimization packs.
-  * Steps or specific Minecraft Bedrock versions (e.g., target client builds, platform architecture) required to reproduce the behavior.
-  * Any relevant file paths, script logs, or proposed remediation steps.
+  * A clear explanation of the security risk or unexpected behavior.
+  * Environment specifics (e.g., Android version, device GPU/SoC, root method, and target application packages).
+  * Reproduction steps, logs, or diagnostic traces.
 
-Maintainers will evaluate the report and apply necessary updates to ensure asset integrity and client stability.
+Maintainers will assess the report and coordinate an appropriate fix to ensure system integrity and rendering stability.
