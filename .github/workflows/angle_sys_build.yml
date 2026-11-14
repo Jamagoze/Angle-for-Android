@@ -1,0 +1,24 @@
+name: build-angle-sys
+on: workflow_dispatch
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract source
+        run: unzip -q -o angle_sys_src.zip -d src
+      - name: Get Zygisk header
+        run: |
+          curl -fsSL -o src/jni/zygisk.hpp https://raw.githubusercontent.com/topjohnwu/zygisk-module-sample/master/module/jni/zygisk.hpp || \
+          curl -fsSL -o src/jni/zygisk.hpp https://raw.githubusercontent.com/topjohnwu/zygisk-module-sample/main/module/jni/zygisk.hpp
+      - name: Build
+        run: |
+          cd src
+          $ANDROID_NDK_HOME/ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=jni/Android.mk NDK_APPLICATION_MK=jni/Application.mk
+          mkdir -p module/zygisk
+          cp libs/arm64-v8a/libangle_block.so module/zygisk/arm64-v8a.so
+          cp libs/armeabi-v7a/libangle_block.so module/zygisk/armeabi-v7a.so
+      - uses: actions/upload-artifact@v4
+        with:
+          name: angle_sys
+          path: src/module/
