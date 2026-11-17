@@ -303,8 +303,6 @@ If you can't boot at all, boot into safe mode (see [Root manager safety nets](#r
 ---
 
 ## Notes
-
-- Affects apps started **after** boot. Skia-on-GL UI rendering goes through ANGLE; **Vulkan-direct** apps and Skia-on-Vulkan (`skiavk`) bypass EGL and are unaffected (for example Mobile Legends renders through Vulkan on the test device).
 - ANGLE is all-or-nothing: the prop is global, so there is no per-app switch. If one app misbehaves, compare with the module disabled.
 - If your root manager says *Unable to extract zip file*, add a `META-INF/com/google/android/` folder with the standard `update-binary` and `updater-script` to the zip.
 - Why not build on-device? The ANGLE/Chromium toolchain only ships for x86_64 Linux, and the checkout is huge, so a cloud build is the practical option on a phone or tablet.
