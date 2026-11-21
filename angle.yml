@@ -1,0 +1,28 @@
+name: build-angle
+on: workflow_dispatch
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Free disk
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android
+      - name: depot_tools
+        run: |
+          git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
+          echo "$PWD/depot_tools" >> $GITHUB_PATH
+      - name: Fetch ANGLE
+        run: |
+          git clone https://chromium.googlesource.com/angle/angle
+          cd angle
+          python3 scripts/bootstrap.py
+          gclient sync -j8
+      - name: Build
+        run: |
+          cd angle
+          gn gen out/a64 --args='target_os="android" target_cpu="arm64" is_debug=false is_component_build=false angle_enable_gl=false angle_enable_vulkan=true android_ndk_api_level=29'
+          autoninja -C out/a64 libEGL libGLESv2 libGLESv1_CM libfeature_support
+      - uses: actions/upload-artifact@v4
+        with:
+          name: angle-arm64
+          path: |
+            angle/out/a64/*.so
