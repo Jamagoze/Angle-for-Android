@@ -19,7 +19,7 @@ jobs:
       - name: Build
         run: |
           cd angle
-          gn gen out/a32 --args='target_os="android" target_cpu="arm" is_debug=false is_official_build=true chrome_pgo_phase=0 symbol_level=0 is_component_build=false angle_enable_gl=false angle_enable_vulkan=true angle_libs_suffix="_angle" android_ndk_api_level=29 extra_cflags="-O3 -mtune=cortex-a73" extra_ldflags="-Wl,--lto-O3"'
+          gn gen out/a32 --args='target_os="android" target_cpu="arm" is_debug=false use_thin_lto=true symbol_level=0 is_component_build=false angle_enable_gl=false angle_enable_vulkan=true angle_libs_suffix="_angle" android_ndk_api_level=29 extra_cflags="-O3 -mtune=cortex-a73" extra_ldflags="-Wl,--lto-O3"'
           autoninja -C out/a32 libEGL libGLESv2 libGLESv1_CM libfeature_support
       - uses: actions/upload-artifact@v4
         with:
